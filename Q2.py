@@ -140,4 +140,122 @@ def spawn_enemy(level):
 def draw_text(text, font, color, surface, x, y):
     text_obj = font.render(text, True, color)
     surface.blit(text_obj, (x, y))
+# Draw Health Bar
+def draw_health_bar(surface, x, y, health):
+    bar_length = 100
+    bar_height = 10
+    fill = (health / 100) * bar_length
+    outline_rect = pygame.Rect(x, y, bar_length, bar_height)
+    fill_rect = pygame.Rect(x, y, fill, bar_height)
+    pygame.draw.rect(surface, GREEN, fill_rect)
+    pygame.draw.rect(surface, WHITE, outline_rect)
+
+# Game Over Screen
+def game_over_screen():
+    screen.fill(BLACK)
+    draw_text("GAME OVER", font, WHITE, screen, WIDTH // 2 - 100, HEIGHT // 2)
+    draw_text("Press R to Restart", font, WHITE, screen, WIDTH // 2 - 120, HEIGHT // 2 + 50)
+    pygame.display.update()
+
+    waiting = True
+    while waiting:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                quit()
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_r:
+                    waiting = False
+
+# Main Game Loop
+def main_game():
+    player = Player()
+    projectiles = pygame.sprite.Group()
+    enemies = pygame.sprite.Group()
+    collectibles = pygame.sprite.Group()
+    all_sprites = pygame.sprite.Group(player)
+
+    score = 0
+    level = 1
+    enemies_killed = 0
+    level_goal = 10  # Enemies needed to complete a level
+    boss_spawned = False
+
+    running = True
+
+    while running:
+        clock.tick(FPS)
+
+        # Event Handling
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                running = False
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_SPACE:
+                    projectile = player.shoot()
+                    projectiles.add(projectile)
+                    all_sprites.add(projectile)
+                if event.key == pygame.K_UP:
+                    player.jump()
+                if event.key == pygame.K_LEFT:
+                    player.speed_x = -PLAYER_SPEED
+                if event.key == pygame.K_RIGHT:
+                    player.speed_x = PLAYER_SPEED
+            if event.type == pygame.KEYUP:
+                if event.key == pygame.K_LEFT or event.key == pygame.K_RIGHT:
+                    player.speed_x = 0
+
+        # Spawning Enemies
+        if not boss_spawned and random.randint(1, 100) < 7:
+            enemy = spawn_enemy(level)
+            enemies.add(enemy)
+            all_sprites.add(enemy)
+
+        # Spawn Boss at Level 3
+        if level == 3 and enemies_killed >= level_goal and not boss_spawned:
+            boss = Boss(WIDTH, HEIGHT - 150)
+            enemies.add(boss)
+            all_sprites.add(boss)
+            boss_spawned = True
+
+        # Update
+        all_sprites.update()
+
+        # Collisions - Player projectiles with enemies
+        for projectile in projectiles:
+            enemy_hit = pygame.sprite.spritecollide(projectile, enemies, False)
+            if enemy_hit:
+                for enemy in enemy_hit:
+                    enemy.take_damage(25)
+                    if enemy.health <= 0:
+                        score += 10
+                        enemies_killed += 1
+                        if enemies_killed >= level_goal and level < 3:
+                            level += 1  # Progress to next level
+                            enemies_killed = 0  # Reset for the new level
+                projectile.kill()
+
+        # Player collision with enemies
+        player_hit = pygame.sprite.spritecollide(player, enemies, False)
+        if player_hit:
+            player.health -= 10
+            if player.health <= 0:
+                player.lives -= 1
+                player.health = 100
+                if player.lives <= 0:
+                    game_over_screen()
+                    running = False
+
+        # Drawing
+        screen.fill(BLACK)
+        all_sprites.draw(screen)
+        draw_text(f"Score: {score}", font, WHITE, screen, 10, 10)
+        draw_text(f"Level: {level}", font, WHITE, screen, 10, 40)
+        draw_health_bar(screen, 10, 70, player.health)
+        pygame.display.flip()
+
+    pygame.quit()
+
+# Start the game
+main_game()
 
